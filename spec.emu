@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf8">
+    <link href="ecmarkup.css" rel="stylesheet">
+    <script src="ecmarkup.js"></script>
+	<title>Reflect.Loader and Reflect.Module</title>
+    <style>
+      .oldtoc {
+          padding: 5em;
+      }
+      .orange {
+        color: #ff6600;
+        margin: 0px;
+      }
+      .list-of-names {
+        list-style-type: none;
+        margin-bottom: 10px;
+        padding-left: 10px;
+      }
+    </style>
+</head>
+<body>
+
+  	<emu-clause id="well-known-symbols">
+		<h1>Well-Known Symbols</h1>
+
+		<p>
+			Well-known symbols are built-in Symbol values that are explicitly referenced by algorithms of this specification. They are typically used as the keys of properties whose values serve as extension points of a specification algorithm.</p>
+
+		<p>
+			Within this specification a well-known symbol is referred to by using a notation of the form @@<i>name</i>, where "<i>name</i>" is one of the values listed in table below:
+		</p>
+
+		<table>
+		  <thead>
+		    <tr>
+		      <th>Specification Name</th>
+		      <th>[[Description]]</th>
+		      <th>Value and Purpose</th>
+		    </tr>
+		  </thead>
+		  <tr>
+		    <td>@@resolve</td>
+		    <td>"Reflect.Loader.resolve"</td>
+		    <td>A function valued property that is the resolve hook function of loader’s instances.</td>
+		  </tr>
+		  <tr>
+		    <td>@@fetch</td>
+		    <td>"Reflect.Loader.fetch"</td>
+		    <td>A function valued property that is the fetch hook function of loader’s instances.</td>
+		  </tr>
+		  <tr>
+		    <td>@@translate</td>
+		    <td>"Reflect.Loader.translate"</td>
+		    <td>A function valued property that is the translate hook function of loader’s instances.</td>
+		  </tr>
+		  <tr>
+		    <td>@@instantiate</td>
+		    <td>"Reflect.Loader.instantiate"</td>
+		    <td>A function valued property that is the instantiate hook function of loader’s instances.</td>
+		  </tr>
+		</table>
+	</emu-clause>
+
+	<emu-clause id="promises">
+		<h1>Promises</h1>
+
+		<p>
+			This spec makes heavy use of promises, and adopts the notational conventions established in the promises guide.
+		</p>
+
+
+		<emu-clause id="reacting-to-promises">
+			<h1>Reacting to Promises</h1>
+
+			<p>
+				<b><i>Transforming</i> p <i>with a new pass-through promise</i></b> is a shorthand for wrapping the promise to avoid exposing the original promise. It represents the following step:
+			</p>
+
+			<emu-alg>
+			1. Transforming _p_ with a fulfillment handler that, when called with argument _value_, returns _value_.
+			</emu-alg>
+
+		</emu-clause>
+
+	</emu-clause>
+
+	<emu-clause id="common-operations">
+		<h1>Common Operations</h1>
+
+		<emu-clause id="create-object" aoid="CreateObject">
+			<h1>CreateObject()</h1>
+
+			<emu-alg>
+			1. Let _obj_ be ObjectCreate(%ObjectPrototype%).
+			1. Return _obj_.
+			</emu-alg>
+		</emu-clause>
+
+		<emu-clause id="simple-define" aoid="SimpleDefine">
+			<h1>SimpleDefine(obj, name, value)</h1>
+
+			<emu-alg>
+			1. Let _desc_ be a new PropertyDescriptor record {[[Value]]: _value_, [[Writable]]: *true*, [[Enumerable]]: *true*, [[Configurable]]: *true*}.
+			1. Return the result of calling OrdinaryDefineOwnProperty(_obj_, _name_, _desc_).
+			</emu-alg>
+
+		</emu-clause>
+
+		<emu-clause id="get-state-value" aoid="GetStateValue">
+			<h1>GetStateValue(state)</h1>
+
+			<emu-alg>
+			1. If _state_ is the string "fetch" return 0.
+			1. If _state_ is the string "translate" return 1.
+			1. If _state_ is the string "instantiate" return 2.
+			1. If _state_ is the string "link" return 3.
+			1. If _state_ is the string "ready" return 4.
+			</emu-alg>
+
+		</emu-clause>
+
+		<emu-clause id="set-state-to-max" aoid="SetStateToMax">
+			<h1>SetStateToMax(entry, newState)</h1>
+
+			<emu-alg>
+			1. Let _state_ be _entry_.[[State]].
+			1. Let _stateValue_ be GetStateValue(_state_).
+			1. Let _newStateValue_ be GetStateValue(_newState_).
+			1. If _newStateValue_ is larger than _stateValue_, set _entry_.[[State]] to _newState_.
+			</emu-alg>
+
+		</emu-clause>
+	</emu-clause>
+
+	<emu-clause id="loader-objects">
+		<h1>Loader Objects</h1>
+
+		<emu-clause id="loader-constructor">
+			<h1>The Reflect.Loader Constructor</h1>
+
+			<p>
+				The Loader constructor is the initial value of the Loader property of the the Reflect object. When called as a constructor it creates and initializes a new Loader object. Reflect.Loader is not intended to be called as a function and will throw an exception when called in that manner.
+			</p>
+
+			<p>
+				The Reflect.Loader constructor is designed to be subclassable. It may be used as the value in an extends clause of a class definition. Subclass constructors that intend to inherit the specified Loader behaviour must include a super call to the Reflect.Loader constructor to create and initialize the subclass instance with the internal state necessary to support the Reflect.Loader.prototype built-in methods.
+			</p>
+
+			<emu-clause id="new-reflect-loader">
+				<h1>Reflect.Loader()</h4>
+
+				When Reflect.Loader is called with no arguments, the following steps are taken:
+
+				<emu-alg>
+				1. If NewTarget is *undefined*, then throw a *TypeError* exception.
+				1. Let _O_ be OrdinaryCreateFromConstructor(NewTarget, "Reflect.Loader.prototype").
+				1. ReturnIfAbrupt(_O_).
+				1. Let _registry_ to a new Registry(_O_).
+				1. Set _O_’s [[Registry]] internal slot to _registry_.
+				1. Return _O_.
+				</emu-alg>
+
+			</emu-clause>
+		</emu-clause>
+
+		<emu-clause id="properties-of-the-loader-constructor">
+			<h1>Properties of the Reflect.Loader Constructor</h1>
+
+			The value of the [[Prototype]] internal slot of the Reflect.Loader constructor is the intrinsic object %FunctionPrototype%.
+
+			Besides the internal slots and the length property (whose value is 0), the Reflect.Loader constructor has the following properties:
+
+			<emu-clause id="Reflect.Loader.prototype">
+				<h1>Reflect.Loader.prototype</h1>
+
+				The value of Reflect.Loader.prototype is an ordinary object.
+
+				This property has the attributes { [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false }.
+
+			</emu-clause>
+		</emu-clause>
+
+		<emu-clause id="sec-properties-of-the-loader-prototype-object">
+			<h1>Properties of the Reflect.Loader Prototype Object</h1>
+
+			<emu-clause id="Reflect.Loader.prototype.constructor">
+				<h1>Reflect.Loader.prototype.constructor</h1>
+
+				<p>
+					The initial value of Reflect.Loader.prototype.constructor is Reflect.Loader.
+				</p>
+			</emu-clause>
+
+			<emu-clause id="reflect-loader-import">
+				<h1>Reflect.Loader.prototype.import(name[, referrer])</h1>
+
+				<p>
+					The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _loader_ be *this* value.
+				1. If Type(_loader_) is not Object, throw a *TypeError* exception.
+				1. If _loader_ does not have a [[Registry]] internal slot throw a *TypeError* exception.
+				1. Return the result of transforming Resolve(_loader_, _name_, _referrer_) with a fulfillment handler that, when called with argument _key_, runs the following steps:
+				  1. Return RequestReady(_loader_, _key_).
+				</emu-alg>
+
+			</emu-clause>
+
+			<emu-clause id="reflect-load-resolve">
+				<h1>Reflect.Loader.prototype.resolve(name[, referrer])</h1>
+
+				<p>
+					The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _loader_ be *this* value.
+				1. If Type(_loader_) is not Object, throw a *TypeError* exception.
+				1. Return Resolve(_loader_, _name_, _referrer_).
+				</emu-alg>
+
+			</emu-clause>
+
+			<emu-clause id="reflect-loader-load">
+				<h1>Reflect.Loader.prototype.load(name[, referrer[, stage]])</h1>
+
+				<p>
+					The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _loader_ be *this* value.
+				1. If Type(_loader_) is not Object, throw a *TypeError* exception.
+				1. If _stage_ is *undefined* then let _stage_ be "ready".
+				1. Return the result of transforming Resolve(_loader_, _name_, _referrer_) with a fulfillment handler that, when called with argument _key_, runs the following steps:
+				  1. If _stage_ is "fetch", then:
+				    1. Return the result of transforming RequestFetch(_loader_, _key_) with a new pass-through promise.
+				  1. If _stage_ is "translate", then:
+				    1. Return the result of transforming RequestTranslate(_loader_, _key_) with a new pass-through promise.
+				  1. If _stage_ is "instantiate", then:
+				    1. Return the result of transforming RequestInstantiateAll(_loader_, _key_) with a fulfillment handler that, when called with argument _entry_, runs the following steps:
+				      1. If _entry_.[[Module]] is a Function object, return _entry_.[[Module]].
+				      1. Return *undefined*.
+				  1. If _stage_ is "link", then:
+				    1. Return the result of transforming RequestLink(_loader_, _key_) with a fulfillment handler that returns *undefined*.
+				  1. If _stage_ is "ready", then:
+				    1. Return the result of transforming RequestReady(_loader_, _key_) with a fulfillment handler that, when called with argument _entry_, runs the following steps:
+				      1. Return GetModuleNamespace(_entry_.[[Module]]).
+				  1. Throw a new *TypeError*.
+				</emu-alg>
+
+			</emu-clause>
+
+			<emu-clause id="relect-loader-registry">
+				<h1>get Reflect.Loader.prototype.registry</h1>
+
+				<p>
+					Reflect.Loader.prototype.registry is an accessor property whose set accessor function is undefined. Its get accessor function performs the following steps:
+				</p>
+
+				<emu-alg>
+				1. Let _loader_ be *this* value.
+				1. Return _loader_.[[Registry]].
+				</emu-alg>
+
+			</emu-clause>
+
+			<emu-clause id="relect-loader-@@tostringtag">
+				<h1>Reflect.Loader.prototype [ @@toStringTag ]</h1>
+
+				<p>
+					The initial value of the @@toStringTag property is the String value "Object".
+				</p>
+
+				<p>
+					This property has the attributes { [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true }.
+				</p>
+
+			</emu-clause>
+		</emu-clause>
+
+		<emu-clause id="reflect-loader-internal-slots">
+			<h1>Properties of Reflect.Loader Instances</h1>
+
+			<p>
+				Loader instances are ordinary objects that inherit properties from the *Reflect.Loader.prototype*.
+			</p>
+
+			<p>
+				Loader instances are initially created with the internal slots described in the following table:
+			</p>
+
+			<table>
+			  <thead>
+			    <tr>
+			      <th>Internal Slot</th>
+			      <th>Value Type (<em>non-normative</em>)</th>
+			      <th>Description (<em>non-normative</em>)</th>
+			    </tr>
+			  </thead>
+			  <tr>
+			    <td>[[Realm]]</td>
+			    <td>Realm Record</td>
+			    <td>The realm this loader belongs to.</td>
+			  </tr>
+			  <tr>
+			    <td>[[Registry]]</td>
+			    <td>An object</td>
+			    <td>An instance of Registry (<a href="#registry">4</a>).</td>
+			  </tr>
+			</table>
+
+		</emu-clause>
+
+	</emu-clause>
+	<emu-clause id="registry">
+		<h1>Registry Objects</h1>
+
+		<emu-clause id="registry-abstract-operations">
+			<h1>Abstract Operations for Registry Objects</h1>
+
+			<emu-clause id="registry-GetRegistryEntry" aoid="GetRegistryEntry">
+				<h1>GetRegistryEntry(registry, key)</h1>
+
+				<p>
+					The abstract operation GetRegistryEntry with arguments registry and key performs the following steps:
+				</p>
+
+				<emu-alg>
+				1. If Type(_registry_) is not Object, throw a *TypeError* exception.
+				1. Let _entries_ be _registry_.[[RegistryData]].
+				1. Let _pair_ be the entry in _entries_ such that _pair_.[[key]] is equal to _key_.
+				1. If _pair_ does not exist, then return *null*.
+				1. Let _entry_ be _pair_.[[value]].
+				1. Let _result_ be CreateObject().
+				1. Call SimpleDefine(_result_, "state", _entry_.[[State]]).
+				1. Let _statePromise_ be *undefined*.
+				1. If _entry_.[[State]] is "fetch" and _entry_.[[Fetch]] is not *undefined*, then
+				  1. Set _statePromise_ to the result of transforming _entry_.[[Fetch]] with a new pass-through promise.
+				1. Else If _entry_.[[State]] is "translate" and _entry_.[[Translate]] is not *undefined*, then
+				  1. Set _statePromise_ to the result of transforming _entry_.[[Translate]] with a new pass-through promise.
+				1. Else If _entry_.[[State]] is "instantiate" and _entry_.[[Instantiate]] is not *undefined*, then
+				  1. Set _statePromise_ to the result of transforming _entry_.[[Instantiate]] with a fulfillment handler that, when called with argument _entry_, runs the following steps:
+				    1. If _entry_.[[Module]] is a Function object, then return _entry_.[[Module]].
+				    1. Return *undefined*.
+				1. Call SimpleDefine(_result_, "statePromise", _statePromise_).
+				1. If _entry_.[[State]] is "ready" then let _module_ be _entry_.[[Module]].
+				1. Else let _module_ be *undefined*.
+				1. Call SimpleDefine(_result_, "module", _module_).
+				1. If _entry_.[[Error]] is *nothing*, then:
+				  1. Call SimpleDefine(_result_, "error", *null*).
+				1. Else:
+				  1. Let _opt_ be CreateObject().
+				  1. Call SimpleDefine(_opt_, "value", _entry_.[[Error]]).
+				  1. Call SimpleDefine(_result_, "error", _opt_).
+				1. Return _result_.
+				</emu-alg>
+
+				A <dfn id="registry-entry">registry entry</dfn> is a record with the following fields:
+
+				<table>
+				  <thead>
+				    <tr>
+				      <th>Internal Slot</th>
+				      <th>Value Type (<em>non-normative</em>)</th>
+				      <th>Description (<em>non-normative</em>)</th>
+				    </tr>
+				  </thead>
+				  <tr>
+				    <td>[[Key]]</td>
+				    <td>String</td>
+				    <td>The resolved module key.</td>
+				  </tr>
+				  <tr>
+				    <td>[[State]]</td>
+				    <td><code>"fetch"</code>, <code>"translate"</code>, <code>"instantiate"</code>, <code>"link"</code>, <code>"ready"</code></td>
+				    <td>A constant value to indicating which phase the entry is at.</td>
+				  </tr>
+				  <tr>
+				    <td>[[Metadata]]</td>
+				    <td>Object or <code>undefined</code></td>
+				    <td>The metadata object passed through the pipeline.</td>
+				  </tr>
+				  <tr>
+				    <td>[[Fetch]]</td>
+				    <td>Promise or <code>undefined</code></td>
+				    <td>A promise for the result of [[#request-fetch]].</td>
+				  </tr>
+				  <tr>
+				    <td>[[Translate]]</td>
+				    <td>Promise or <code>undefined</code></td>
+				    <td>A promise for the result of [[#request-translate]].</td>
+				  </tr>
+				  <tr>
+				    <td>[[Instantiate]]</td>
+				    <td>Promise or <code>undefined</code></td>
+				    <td>A promise for the result of [[#request-instantiate]].</td>
+				  </tr>
+				  <tr>
+				    <td>[[Dependencies]]</td>
+				    <td>List of pairs of String and (<a>registry entry</a> or <code>undefined</code>), or <code>undefined</code>.</td>
+				    <td>Table mapping unresolved names to their resolved modules.</td>
+				  </tr>
+				  <tr>
+				    <td>[[Module]]</td>
+				    <td>Module Record or Function object or <code>undefined</code></td>
+				    <td>The Module Record if the entry is ready, or a thunk if the entry is delayed; otherwise <code>undefined</code>.</td>
+				  </tr>
+				  <tr>
+				    <td>[[Error]]</td>
+				    <td>Any or <b>nothing</b></td>
+				    <td>An error that was encountered during one of the phases of the loading pipeline; <b>nothing</b> if no error has been encountered.</td>
+				  </tr>
+				</table>
+
+			</emu-clause>
+		</emu-clause>
+
+		<emu-clause id="registry-constructor">
+			<h1>The Registry Constructor</h1>
+
+			<p>
+				The Registry constructor is the %Registry% intrinsic object. When called as a constructor it creates and initializes a new %Registry% object. %Registry% is not intended to be called as a function and will throw an exception when called in that manner.
+			</p>
+
+			<emu-clause id="new-registry" aoid="Registry">
+				<h1>Registry(loader)</h1>
+
+				<p>
+					When Registry is called with argument <i>loader</i>, the following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. If NewTarget is *undefined*, then throw a *TypeError* exception.
+				1. If Type(_loader_) is not Object, throw a *TypeError* exception.
+				1. Let _O_ be OrdinaryCreateFromConstructor(NewTarget, "%RegistryPrototype%", «[[RegistryData]]» ).
+				1. ReturnIfAbrupt(_O_).
+				1. Set _O_’s [[RegistryData]] internal slot to a new empty List.
+				1. Set _O_’s [[Loader]] internal slot to _loader_.
+				1. Return _O_.
+				</emu-alg>
+
+			</emu-clause>
+		</emu-clause>
+
+		<emu-class id="properties-of-the-registry-constructor">
+			<h1>Properties of the Registry Constructor</h1>
+
+			<p>
+				The value of the [[Prototype]] internal slot of the Registry constructor is the intrinsic object %FunctionPrototype%.
+			</p>
+
+			<p>
+				Besides the internal slots and the length property (whose value is 0), the Registry constructor has the following properties:
+			</p>
+
+			<emu-clause id="registry-prototype">
+				<h1>Registry.prototype</h1>
+
+				<p>
+					The value of Registry.prototype is %RegistryPrototype%.
+				</p>
+
+				<p>
+					This property has the attributes { [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false }.
+				</p>
+			</emu-clause>
+		</emu-clause>
+
+		<emu-clause id="registry-prototype-object">
+			<h1>Properties of the Registry Prototype Object</h1>
+
+			<emu-clause id="registry-prototype-constructor">
+				<h1>Registry.prototype.constructor</h1>
+
+				<p>
+					The initial value of Registry.prototype.constructor is %Registry%.
+				</p>
+
+			</emu-clause>
+
+			<emu-clause id="registry-prototype-@@iterator">
+				<h1>Registry.prototype[ @@iterator ]()</h1>
+
+				<p>
+					When the @@iterator method is called it returns an Iterator object (ES2015 25.1.1.2) that iterates over the registry entries of the [[RegistryData]] internal slot, returning each entry as a key value pair. The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _registry_ be *this* value.
+				1. Let _entries_ be a new List.
+				1. For each _pair_ in _registry_.[[RegistryData]], do:
+				  1. Let _key_ be _pair_.[[key]].
+				  1. Let _entry_ be GetRegistryEntry(_registry_, _key_).
+				  1. Append { [[key]]: _key_, [[value]]: _entry_ } to _entries_.
+				1. Return CreateListIterator(_entries_).
+				</emu-alg>
+
+				The value of the name property of this function is "[Symbol.iterator]".
+
+			</emu-clause>
+			<emu-clause id="registry-prototype-lookup">
+				<h1>Registry.prototype.lookup(key)</h1>
+
+				<p>
+					The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _registry_ be *this* value.
+				1. Return GetRegistryEntry(_registry_, _key_).
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="registry-prototype-install">
+				<h1>Registry.prototype.install(key, module)</h1>
+
+				<p>
+					The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _registry_ be *this* value.
+				1. If Type(_registry_) is not Object, throw a *TypeError* exception.
+				1. Let _entries_ be _registry_.[[RegistryData]].
+				1. Let _pair_ be the entry in _entries_ such that _pair_.[[key]] is equal to _key_.
+				1. If _pair_ exists, then throw a new *TypeError*.
+				1. Let _entry_ be a new registry entry record { [[Key]]: _key_, [[State]]: "ready", [[Metadata]]: *undefined*, [[Fetch]]: *undefined*, [[Translate]]: *undefined*, [[Instantiate]]: *undefined*, [[Dependencies]]: *undefined*, [[Module]]: _module_ }.
+				1. Append { [[key]]: _key_, [[value]]: _entry_ } to _entries_.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="registry-prototype-uninstall">
+				<h1>Registry.prototype.uninstall(key)</h1>
+
+				<p>
+					The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _registry_ be *this* value.
+				1. If Type(_registry_) is not Object, throw a *TypeError* exception.
+				1. Let _entries_ be _registry_.[[RegistryData]].
+				1. Let _pair_ be the entry in _entries_ such that _pair_.[[key]] is equal to _key_.
+				1. If _pair_ does not exist, then throw a new *TypeError*.
+				1. Let _stateValue_ be GetStateValue(_pair_.[[value]].[[State]]).
+				1. Let _linkStateValue_ be GetStateValue("link").
+				1. If _stateValue_ is less than _linkStateValue_, then throw a new *TypeError*.
+				1. Remove _pair_ from _entries_.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="registry-prototype-cancel">
+				<h1>Registry.prototype.cancel(key)</h1>
+
+				<p>
+					The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _registry_ be *this* value.
+				1. If Type(_registry_) is not Object, throw a *TypeError* exception.
+				1. Let _entries_ be _registry_.[[RegistryData]].
+				1. Let _pair_ be the entry in _entries_ such that _pair_.[[key]] is equal to _key_.
+				1. If _pair_ does not exist, then throw a new *TypeError*.
+				1. Let _entry_ be _pair_.[[value]].
+				1. Let _stateValue_ be GetStateValue(_entry_.[[State]]).
+				1. Let _linkStateValue_ be GetStateValue("link").
+				1. If _stateValue_ is greater than or equal to _linkStateValue_, throw a new *TypeError*.
+				1. Remove _pair_ from _entries_.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="registry-prototype-provide">
+				<h1>Registry.prototype.provide(key, stage, value)</h1>
+
+				<p>
+					The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _registry_ be *this* value.
+				1. If Type(_registry_) is not Object, throw a *TypeError* exception.
+				1. Let _loader_ be _registry_.[[Loader]] value.
+				1. Let _entry_ be EnsureRegistered(_loader_, _key_).
+				1. If _stage_ is "fetch", then:
+				  1. Let _stateValue_ be GetStateValue(_entry_.[[State]]).
+				  1. Let _fetchStateValue_ be GetStateValue("fetch").
+				  1. If _stateValue_ is greater than _fetchStateValue_, throw a new *TypeError*.
+				  1. Call FulfillFetch(_loader_, _entry_, _value_).
+				  1. Return *undefined*.
+				1. If _stage_ is "translate", then:
+				  1. Let _stateValue_ be GetStateValue(_entry_.[[State]]).
+				  1. Let _translateStateValue_ be GetStateValue("translate").
+				  1. If _stateValue_ is greater than _translateStateValue_, throw a new *TypeError*.
+				  1. Call FulfillFetch(_loader_, _entry_, *undefined*).
+				  1. Call FulfillTranslate(_loader_, _entry_, _value_).
+				  1. Return *undefined*.
+				1. If _stage_ is "instantiate", then:
+				  1. Let _stateValue_ be GetStateValue(_entry_.[[State]]).
+				  1. Let _instantiateStateValue_ be GetStateValue("instantiate").
+				  1. If _stateValue_ is greater than _instantiateStateValue_, throw a new *TypeError*.
+				  1. Call FulfillFetch(_loader_, _entry_, *undefined*).
+				  1. Call FulfillTranslate(_loader_, _entry_, *undefined*).
+				  1. Assert: _entry_.[[Translate]] is resolved or rejected.
+				  1. TODO: need to propagate rejections
+				  1. Let _source_ be the fulfillment value of _entry_.[[Translate]].
+				  1. Call FulfillInstantiate(_loader_, _entry_, _value_, _source_).
+				  1. Return *undefined*.
+				1. Throw a new *TypeError*.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="registry-prototype-error">
+				<h1>Registry.prototype.error(key, stage, value)</h1>
+
+				<p>
+					The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. // TODO
+				</emu-alg>
+
+			</emu-clause>
+		</emu-clause>
+		<emu-clause id="registry-internal-slots">
+			<h1>Properties of Registry Instances</h1>
+
+			<p>
+				Registry instances are ordinary objects that inherit properties from the %RegistryPrototype%.
+			</p>
+
+			<p>
+				Registry instances are initially created with the internal slots described in the following table:
+			</p>
+
+			<table>
+			  <thead>
+			    <tr>
+			      <th>Internal Slot</th>
+			      <th>Value Type (<em>non-normative</em>)</th>
+			      <th>Description (<em>non-normative</em>)</th>
+			    </tr>
+			  </thead>
+			  <tr>
+			    <td>[[RegistryData]]</td>
+			    <td>List of pairs of String and <a href="#registry-entry">registry entry</a>.</td>
+			    <td>The registry of installed modules.</td>
+			  </tr>
+			  <tr>
+			    <td>[[Loader]]</td>
+			    <td>An object</td>
+			    <td>The loader this registry belongs to.</td>
+			  </tr>
+			</table>
+
+		</emu-clause>
+	</emu-clause>
+
+
+	<emu-clause id="pipeline-semantics">
+		<h1>Loading Semantics</h1>
+
+		<emu-clause id="auxiliary-operations">
+			<h1>Auxiliary Operations</h1>
+
+			<emu-clause id="ensure-registered" aoid="EnsureRegistered">
+				<h1>EnsureRegistered(loader, key)</h1>
+
+				<emu-alg>
+				1. Assert: _loader_ has a [[Registry]] internal slot.
+				1. Let _pair_ be the entry in _loader_.[[Registry]] such that _pair_.[[key]] is equal to _key_.
+				1. If _pair_ exists, then:
+				  1. Let _entry_ be _pair_.[[value]].
+				1. Else:
+				  1. Let _entry_ be a new registry entry record { [[Key]]: _key_, [[State]]: "fetch", [[Metadata]]: *undefined*, [[Fetch]]: *undefined*, [[Translate]]: *undefined*, [[Instantiate]]: *undefined*, [[Dependencies]]: *undefined*, [[Module]]: *undefined*, [[Error]]: *nothing* }.
+				  1. Append { [[key]]: _key_, [[value]]: _entry_ } to _loader_.[[Registry]].
+				1. Return _entry_.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="resolve" aoid="Resolve">
+				<h1>Resolve(loader, name, referrer)</h1>
+
+				<emu-alg>
+				1. Let _hook_ be GetMethod(_loader_, @@resolve).
+				1. Return the result of promise-calling _hook_(_name_, _referrer_).
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="fulfill-fetch" aoid="FulfillFetch">
+				<h1>FulfillFetch(loader, entry, payload)</h1>
+
+				<emu-alg>
+				1. If _entry_.[[Fetch]] is *undefined*, then set _entry_.[[Fetch]] to a promise resolved with _payload_.
+				1. Else fulfill _entry_.[[Fetch]] with _payload_.
+				1. SetStateToMax(_entry_, "translate").
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="fulfill-translate" aoid="FulfillTranslate">
+				<h1>FulfillTranslate(loader, entry, source)</h1>
+
+				<emu-alg>
+				1. If _entry_.[[Translate]] is *undefined*, then set _entry_.[[Translate]] to a promise resolved with _source_.
+				1. Else fulfill _entry_.[[Translate]] with _source_.
+				1. SetStateToMax(_entry_, "instantiate").
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="fulfill-instantiate" aoid="FulfillInstantiate">
+				<h1>FulfillInstantiate(loader, entry, optionalInstance, source)</h1>
+
+				<emu-alg>
+				1. If _entry_.[[Instantiate]] is *undefined*, then set _entry_.[[Instantiate]] to a new promise.
+				1. Return CommitInstantiated(_loader_, _entry_, _optionalInstance_, _source_).
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="commit-instantiated" aoid="CommitInstantiated">
+				<h1>CommitInstantiated(loader, entry, optionalInstance, source)</h1>
+
+				<emu-alg>
+				1. Let _instance_ be Instantiation(_loader_, _optionalInstance_, _source_).
+				1. ReturnIfAbrupt(_instance_).
+				1. // TODO: edge case: what if _instance_ is a thenable function?
+				1. Let _deps_ be a new empty List.
+				1. If _instance_ is a Module Record, then:
+				  1. Assert: _instance_ is a Source Text Module Record.
+				  1. Set _instance_.[[RegistryEntry]] to _entry_.
+				  1. For each _dep_ in _instance_.[[RequestedModules]], do:
+				    1. Append the record { [[key]]: _dep_, [[value]]: *undefined* } to _deps_.
+				1. Set _entry_.[[Dependencies]] to _deps_.
+				1. Set _entry_.[[Module]] to _instance_.
+				1. SetStateToMax(_entry_, "link").
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="instantiation" aoid="Instantiation">
+				<h1>Instantiation(loader, result, source)</h1>
+
+				<emu-alg>
+				1. If _result_ is *undefined*, then return ParseModule(_source_).
+				1. If IsCallable(_result_) is *false* then throw a new *TypeError*.
+				1. Set _result_.[[Realm]] to _loader_.[[Realm]].
+				1. Return _result_.
+				</emu-alg>
+
+			</emu-clause>
+		</emu-clause>
+
+		<emu-clause id="loading-operations">
+			<h1>Loading Operations</h1>
+
+				<emu-clause id="request-fetch" aoid="RequestFetch">
+				<h1>RequestFetch(loader, key)</h1>
+
+				<emu-alg>
+				1. Let _entry_ be EnsureRegistered(_loader_, _key_).
+				1. Let _stateValue_ be GetStateValue(_entry_.[[State]]).
+				1. Let _linkStateValue_ be GetStateValue("link").
+				1. If _stateValue_ is greater than _linkStateValue_, return a new error promise.
+				1. If _entry_.[[Fetch]] is not *undefined*, return _entry_.[[Fetch]].
+				1. Let _hook_ be GetMethod(_loader_, @@fetch).
+				1. // TODO: metadata object
+				1. Let _p0_ be the result of promise-calling _hook_(_key_).
+				1. Let _p1_ be the result of transforming _p0_ with a new pass-through promise.
+				1. Let _p2_ be the result of transforming _p1_ with a fulfillment handler that, when called with argument _payload_, runs the following steps:
+				  1. SetStateToMax(_entry_, "translate").
+				  1. Return _payload_.
+				1. Set _entry_.[[Fetch]] to _p1_.
+				1. Return _p1_.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="request-translate" aoid="RequestTranslate">
+				<h1>RequestTranslate(loader, key)</h1>
+
+				<emu-alg>
+				1. Let _entry_ be EnsureRegistered(_loader_, _key_).
+				1. Let _stateValue_ be GetStateValue(_entry_.[[State]]).
+				1. Let _linkStateValue_ be GetStateValue("link").
+				1. If _stateValue_ is greater than _linkStateValue_, return a new error promise.
+				1. If _entry_.[[Translate]] is not *undefined*, return _entry_.[[Translate]].
+				1. Let _hook_ be GetMethod(_loader_, @@translate).
+				1. Let _p_ be the result of transforming RequestFetch(_loader_, _key_) with a fulfillment handler that, when called with argument _payload_, runs the following steps:
+				  1. // TODO: metadata
+				  1. Let _p0_ be the result of promise-calling _hook_(_key_, _payload_).
+				  1. Let _p1_ be the result of transforming _p0_ with a new pass-through promise.
+				  1. Let _p2_ be the result of transforming _p1_ with a fulfillment handler that, when called with argument _source_, runs the following steps:
+				    1. SetStateToMax(_entry_, "instantiate").
+				    1. Return _source_.
+				  1. Return _p1_.
+				1. Set _entry_.[[Translate]] to _p_.
+				1. Return _p_.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="request-instantiate" aoid="RequestInstantiate">
+				<h1>RequestInstantiate(loader, key)</h1>
+
+				<emu-alg>
+				1. Let _entry_ be EnsureRegistered(_loader_, _key_).
+				1. If _entry_.[[State]] is "ready", return a new error promise.
+				1. If _entry_.[[Instantiate]] is not *undefined*, return _entry_.[[Instantiate]].
+				1. Let _hook_ be GetMethod(_loader_, @@instantiate).
+				1. Let _p_ be the result of transforming RequestTranslate(_loader_, _key_) with a fulfillment handler that, when called with argument _source_, runs the following steps:
+				  1. // TODO: metadata
+				  1. Let _p0_ be the result of promise-calling _hook_(_key_, _source_).
+				  1. Let _p1_ be the result of transforming _p0_ with a new pass-through promise.
+				  1. Let _p2_ be the result of transforming _p1_ with a fulfillment handler that, when called with argument _optionalInstance_, runs the following steps:
+				    1. Let _status_ be CommitInstantiated(_loader_, _entry_, _optionalInstance_, _source_).
+				    1. ReturnIfAbrupt(_status_).
+				    1. Return _entry_.
+				  1. Return _p1_.
+				1. Set _entry_.[[Instantiate]] to _p_.
+				1. Return _p_.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="request-instantiate-all" aoid="RequestInstantiateAll">
+				<h1>RequestInstantiateAll(loader, key)</h1>
+
+				<emu-alg>
+				1. Return the result of transforming RequestInstantiate(_loader_, _key_) with a fulfillment handler that, when called with argument _entry_, runs the following steps:
+				  1. Let _depLoads_ be a new empty List.
+				  1. For each _pair_ in _entry_.[[Dependencies]], do:
+				    1. Let _p_ be the result of transforming Resolve(_loader_, _pair_.[[key]], _key_) with a fulfillment handler that, when called with value _depKey_, runs the following steps:
+				      1. Let _depEntry_ be EnsureRegistered(_loader_, _depKey_).
+				      1. If _depEntry_.[[State]] is "ready", then:
+				        1. Let _dep_ be _depEntry_.[[Module]].
+				        1. Set _pair_.[[value]] to _dep_.
+				        1. Return _dep_.
+				      1. Return the result of transforming RequestInstantiateAll(_loader_, _depKey_) with a fulfillment handler that, when called with value _depEntry_, runs the following steps:
+				        1. Let _dep_ be _depEntry_.[[Module]].
+				        1. Set _pair_.[[value]] to _dep_.
+				        1. Return _dep_.
+				    1. Append _p_ to _depLoads_.
+				  1. Let _p_ be the result of waiting for all _depLoads_.
+				  1. Return the result of transforming _p_ with a fulfillment handler that, when called, runs the following steps:
+				    1. Return _entry_.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="request-link" aoid="RequestLink">
+				<h1>RequestLink(loader, key)</h1>
+
+				<emu-alg>
+				1. Let _entry_ be EnsureRegistered(_loader_, _key_).
+				1. If _entry_.[[State]] is "ready", return a promise resolved with _entry_.[[Module]].
+				1. Return the result of transforming RequestInstantiateAll(_loader_, _key_) with a fulfillment handler that, when called with argument _entry_, runs the following steps:
+				  1. Assert: _entry_'s whole dependency graph is in "link" state.
+				  1. Let _status_ be Link(_loader_, _entry_).
+				  1. ReturnIfAbrupt(_status_).
+				  1. Assert: _entry_'s whole dependency graph is in "ready" state.
+				  1. Return _entry_.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="request-ready" aoid="RequestReady">
+				<h1>RequestReady(loader, key)</h1>
+
+				<emu-alg>
+				1. Return the result of transforming RequestLink(_loader_, _key_) with a fulfillment handler that, when called with argument _entry_, runs the following steps:
+				  1. Let _module_ be _entry_.[[Module]].
+				  1. Let _status_ be the result of calling the ModuleEvaluation abstract operation of _module_ with no arguments.
+				  1. ReturnIfAbrupt(_status_).
+				  1. Return _module_.
+				</emu-alg>
+
+			</emu-clause>
+		</emu-clause>
+	</emu-clause>
+
+	<emu-clause id="module-objects">
+		<h1>Module Objects</h1>
+
+		<emu-clause id="reflective-module-record">
+			<h1>Reflective Module Records</h1>
+
+			<p>
+				A <dfn>reflective module record</dfn> is a kind of module record. It extends
+			</p>
+
+			<table>
+			  <thead>
+			    <tr>
+			      <th>Internal Slot</th>
+			      <th>Value Type (<em>non-normative</em>)</th>
+			      <th>Description (<em>non-normative</em>)</th>
+			    </tr>
+			  </thead>
+			  <tr>
+			    <td>[[LocalExports]]</td>
+			    <td>A List of Strings</td>
+			    <td>The set of exported names stored in this module's environment.</td>
+			  </tr>
+			  <tr>
+			    <td>[[IndirectExports]]</td>
+			    <td>A List of pairs of String and {[[module]]: Module Record, [[bindingName]]: String}.</td>
+			    <td>The set of re-exported bindings. This ensures that ResolveExport can fully resolve re-exports.</td>
+			  </tr>
+			  <tr>
+			    <td>[[Evaluate]]</td>
+			    <td>A function object or <code>undefined</code></td>
+			    <td>A thunk to call when the the module is evaluated, or <code>undefined</code> if the module is already evaluated.</td>
+			  </tr>
+			</table>
+
+		</emu-clause>
+		<emu-clause id="module-abstract-operations">
+			<h1>Abstract Operations for Module Objects</h1>
+
+			<emu-clause id="parse-exports-descriptors" aoid="ParseExportsDescriptors">
+				<h1>ParseExportsDescriptors(obj)</h1>
+
+				<b>TODO:</b> parse as in <a href="https://gist.github.com/dherman/fbf3077a2781df74b6d8">these examples</a>
+				<ul>
+				  <li>uninitialized, mutable: <code>{ }</code>
+				  <li>uninitialized, immutable: <code>{ const: true }</code>
+				  <li>initialized, mutable: <code>{ value: 42 }</code>
+				  <li>initialized, immutable: <code>{ value: 42, const: true }</code>
+				  <li>re-export (immutable): <code>{ module: m, import: "foo" }</code>
+				</ul>
+
+				<emu-alg>
+				1. // TODO: spec me
+				</emu-alg>
+
+ 			</emu-clause>
+			<emu-clause id="create-module-mutator" aoid="CreateModuleMutator">
+				<h1>CreateModuleMutator(module)</h1>
+
+				<emu-alg>
+				1. // TODO: spec me
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="get-export-names" aoid="GetExportNames">
+				<h1>GetExportNames(exportStarStack)</h1>
+
+				<p>
+					The following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _module_ be this Reflective Module Record.
+				1. Let _exports_ be a new empty List.
+				1. For each _name_ in _module_.[[LocalExports]], do:
+				  1. Append _name_ to _exports_.
+				1. For each _pair_ in _module_.[[IndirectExports]], do:
+				  1. Append _pair_.[[key]] to _exports_.
+				1. Return _exports_.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="resolve-export" aoid="ResolveExport">
+				<h1>ResolveExport(exportName, resolveStack, exportStarStack)</h1>
+
+				<emu-alg>
+				1. Let _module_ be this Reflective Module Record.
+				1. If _resolveStack_ contains a record _r_ such that _r_.[[module]] is equal to _module_ and _r_.[[exportName]] is equal to _exportName_, then
+				  1. Assert: this is a circular import request.
+				  1. Throw a SyntaxError exception.
+				1. Append the record {[[module]]: _module_, [[exportName]]: _exportName_} to _resolveStack_.
+				1. Let _exports_ be _module_.[[LocalExports]].
+				1. Let _pair_ be the pair in _exports_ such that _pair_.[[key]] is equal to _exportName_.
+				1. If _pair_ is defined, then:
+				  1. Return the Record { [[module]]: _module_, [[bindingName]]: _exportName_ }.
+				1. Let _exports_ be _module_.[[IndirectExports]].
+				1. Let _pair_ be the pair in _exports_ such that _pair_.[[key]] is equal to _exportName_.
+				1. If _pair_ is defined, then return _pair_.[[value]].
+				1. Return *null*.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="module-declaration-instantiation" aoid="ModuleDeclarationInstantiation">
+				<h1>ModuleDeclarationInstantiation()</h1>
+
+				<p>
+					Reflective modules are always already instantiated.
+				</p>
+
+				<emu-alg>
+				1. Return *undefined*.
+				</emu-alg>
+
+			</emu-clause>
+			<emu-clause id="module-evaluation" aoid="ModuleEvaluation">
+				<h1>ModuleEvaluation()</h1>
+
+				<emu-alg>
+				1. Let _module_ be this Reflective Module Record.
+				1. Let _evaluate_ be _module_.[[Evaluate]].
+				1. Set _module_.[[Evaluate]] to *undefined*.
+				1. Return _evaluate_().
+				</emu-alg>
+
+			</emu-clause>
+		</emu-clause>
+
+		<emu-clause id="module-constructor">
+			<h1>The Reflect.Module Constructor</h1>
+
+			<p>
+				The Module constructor is the initial value of the Module property of the the Reflect object. When called as a constructor it creates and initializes a new Module object. Reflect.Module is not intended to be called as a function and will throw an exception when called in that manner.
+			</p>
+
+			<p>
+				The Reflect.Module constructor is designed to be subclassable. It may be used as the value in an extends clause of a class definition. Subclass constructors that intend to inherit the specified Module behaviour must include a super call to the Reflect.Module constructor to create and initialize the subclass instance with the internal state necessary to integrated with loaders.
+			</p>
+
+ 			<emu-clause id="new-reflect-module">
+				<h1>Reflect.Module(descriptors[, executor[, evaluate]])</h1>
+
+				<p>
+					When Reflect.Module is called with arguments <i>descriptors</i>, <i>executor</i>, and <i>evaluate</i>, the following steps are taken:
+				</p>
+
+				<emu-alg>
+				1. Let _realm_ be the current Realm.
+				1. Let _env_ be NewModuleEnvironment(_realm_.[[globalEnv]]).
+				1. Let _exportDescriptors_ be ParseExportsDescriptors(_descriptors_). // TODO: interleave the subsequent loop with parsing?
+				1. Let _localExports_ be a new empty List.
+				1. Let _indirectExports_ be a new empty List.
+				1. Let _exportNames_ be a new empty List.
+				1. Let _envRec_ be _env_'s environment record.
+				1. For each _desc_ in _exportDescriptors_, do:
+				  1. Let _exportName_ be _desc_.[[Name]].
+				  1. Append _exportName_ to _exportNames_.
+				  1. If _desc_ is an Indirect Export Descriptor, then:
+				    1. Let _otherMod_ be _desc_.[[Module]].
+				    1. Let _resolution_ be _otherMod_.ResolveExport(_desc_.[[Import]], « »).
+				    1. ReturnIfAbrupt(_resolution_).
+				    1. If _resolution_ is *null*, then throw a SyntaxError exception.
+				    1. Append the record {[[key]]: _exportName_, [[value]]: _resolution_} to _indirectExports_.
+				  1. Else:
+				    1. Append _exportName_ to _localExports_.
+				    1. If _desc_ is an Immutable Export Descriptor, then:
+				      1. Let _status_ be _envRec_.CreateImmutableBinding(_exportName_, *true*).
+				      1. Assert: _status_ is not an abrupt completion.
+				    1. Else:
+				      1. Assert: _desc_ is a Mutable Export Descriptor.
+				      1. Let _status_ be _envRec_.CreateMutableBinding(_exportName_, *false*).
+				      1. Assert: _status_ is not an abrupt completion.
+				    1. If _desc_.[[Initialized]] is *true*, then:
+				      1. Call _envRec_.InitializeBinding(_exportName_, _desc_.[[Value]]).
+				1. If _evaluate_ is *undefined*, then let _evaluated_ be *true*. Otherwise let _evaluated_ be *false*.
+				1. Let _mod_ be a new Reflective Module Record {[[Realm]]: _realm_, [[Environment]]: _env_, [[Namespace]]: *undefined*, [[Evaluated]]: _evaluated_, [[LocalExports]]: _localExports_, [[IndirectExports]]: _indirectExports_, [[Evaluate]]: _evaluate_}.
+				1. Let _ns_ be ModuleNamespaceCreate(_mod_, _realm_, _exportNames_).
+				1. Set _mod_.[[Namespace]] to _ns_.
+				1. If _executor_ is not *undefined*, then
+				  1. Let _mutator_ be CreateModuleMutator(_mod_).
+				  1. Let _status_ be _executor_(_mutator_, _ns_).
+				  1. ReturnIfAbrupt(_status_).
+				1. Return _ns_.
+				</emu-alg>
+
+			</emu-clause>
+
+		</emu-clause>
+
+		<emu-clause id="properties-of-the-module-constructor">
+			<h1>Properties of the Reflect.Module Constructor</h1>
+
+			<p>
+				The value of the [[Prototype]] internal slot of the Reflect.Module constructor is the intrinsic object %FunctionPrototype%.
+			</p>
+
+			<p>
+				Besides the internal slots and the length property (whose value is 0), the Reflect.Loader constructor has the following properties:
+			</p>
+
+			<emu-clause id="Reflect.Module.evaluate">
+				<h1>Reflect.Module.evaluate(m)</h1>
+
+				<p>
+					<b>TODO:</b> way to force evaluation of a module namespace exotic object (<code>Reflect.Module.evaluate(m)</code>? <code>m[Reflect.Module.evaluate]()</code>?)
+				</p>
+
+			</emu-clause>
+			<emu-clause id="Reflect.Module.prototype">
+				<h1>Reflect.Module.prototype</h1>
+
+				<p>
+					The value of Reflect.Module.prototype is an ordinary object with a null [[Prototype]].
+				</p>
+
+				<p>
+					This property has the attributes { [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false }.
+				</p>
+
+			</emu-clause>
+		</emu-clause>
+
+	 	<emu-clause id="reflect-module-internal-slots">
+			<h1>Properties of Module Instances</h1>
+
+			<p>
+				Reflect.Module instances are module namespace exotic objects.
+			</p>
+		</emu-clause>
+	</emu-clause>
+
+</body>
+</html>
