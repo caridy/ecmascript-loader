@@ -4,8 +4,8 @@
 	"description": "ES7 spec proposal for Reflect.Loader and Reflect.Module (uplifted from whatwg/loader proposal)",
 	"private": true,
 	"scripts": {
-		"build": "ecmarkup spec.emu --old-toc --js=ecmarkup.js --css=ecmarkup.css spec.html",
-		"watch": "ecmarkup spec.emu --old-toc --watch --js=ecmarkup.js --css=ecmarkup.css spec.html",
+		"build": "ecmarkup spec.emu --old-toc --js=ecmarkup.js --css=ecmarkup.css index.html",
+		"watch": "ecmarkup spec.emu --old-toc --watch --js=ecmarkup.js --css=ecmarkup.css index.html",
 		"prepublish": "npm run build"
 	},
 	"repository": {
